@@ -39,22 +39,30 @@ label_encoder = LabelEncoder()
 ohe = OneHotEncoder(sparse=False, handle_unknown='ignore')
 
 # Predefined column names after OneHotEncoding 'Geography'
-geography_columns = ['France', 'Germany', 'Spain']
+geography_columns = ['Geography_France', 'Geography_Germany', 'Geography_Spain']
 
 # Placeholder function for preprocessing
 def preprocess_data(data):
-    # Perform label encoding on 'Gender' column
+    # Drop 'Surname' column if present
+    if 'Surname' in data.columns:
+        data = data.drop(['Surname'], axis=1)
+    
+    # Convert 'Gender' and 'Geography' columns to category type
+    if 'Gender' in data.columns:
+        data['Gender'] = data['Gender'].astype('category')
+    
+    if 'Geography' in data.columns:
+        data['Geography'] = data['Geography'].astype('category')
+    
+    # Label encode 'Gender' column
     if 'Gender' in data.columns:
         data['Gender'] = label_encoder.transform(data['Gender'].astype(str))
     
-    # Perform one-hot encoding on 'Geography' column
+    # One-hot encode 'Geography' column
     if 'Geography' in data.columns:
-        # Fit and transform on 'Geography' column
-        geography_encoded = pd.DataFrame(ohe.transform(data[['Geography']]), 
-                                         index=data.index, 
-                                         columns=geography_columns)
-        # Combine encoded 'Geography' with the rest of the data and drop the old 'Geography' column
-        data = pd.concat([data.drop('Geography', axis=1), geography_encoded], axis=1)
+        geo_encoded = pd.DataFrame(ohe.transform(data[['Geography']]), 
+                                   columns=geography_columns)
+        data = pd.concat([data.drop('Geography', axis=1), geo_encoded], axis=1)
     
     return data
 
@@ -89,10 +97,10 @@ def main():
         st.write(predictions)
 
         # If you have the true labels in the data, you can evaluate the model
-        # Assuming the true labels column is 'label'
-        if 'label' in data.columns:
-            y_true = data['label']
-            y_pred = model.predict(data.drop(columns=['label']))
+        # Assuming the true labels column is 'Exited'
+        if 'Exited' in data.columns:
+            y_true = data['Exited']
+            y_pred = model.predict(data.drop(columns=['Exited']))
 
             # Calculate evaluation metrics
             accuracy = accuracy_score(y_true, y_pred)
