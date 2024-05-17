@@ -8,19 +8,55 @@ Original file is located at
 """
 import subprocess
 
-# Check if joblib is installed, if not, install it
+# Check if necessary libraries are installed, if not, install them
 try:
     import joblib
 except ImportError:
     subprocess.check_call(['pip', 'install', 'joblib'])
-import streamlit as st
-import pandas as pd
+
+try:
+    import streamlit as st
+except ImportError:
+    subprocess.check_call(['pip', 'install', 'streamlit'])
+
+try:
+    import pandas as pd
+except ImportError:
+    subprocess.check_call(['pip', 'install', 'pandas'])
+
+try:
+    from sklearn.preprocessing import LabelEncoder, OneHotEncoder
+except ImportError:
+    subprocess.check_call(['pip', 'install', 'scikit-learn'])
+
 import joblib
-from sklearn.metrics import accuracy_score, recall_score, precision_score, f1_score
-from sklearn.metrics import classification_report
 
 # Load the trained model
 model = joblib.load('best_model.pkl')
+
+# Instantiate the encoders
+label_encoder = LabelEncoder()
+ohe = OneHotEncoder(sparse=False, handle_unknown='ignore')
+
+# Predefined column names after OneHotEncoding 'Geography'
+geography_columns = ['France', 'Germany', 'Spain']
+
+# Placeholder function for preprocessing
+def preprocess_data(data):
+    # Perform label encoding on 'Gender' column
+    if 'Gender' in data.columns:
+        data['Gender'] = label_encoder.transform(data['Gender'].astype(str))
+    
+    # Perform one-hot encoding on 'Geography' column
+    if 'Geography' in data.columns:
+        # Fit and transform on 'Geography' column
+        geography_encoded = pd.DataFrame(ohe.transform(data[['Geography']]), 
+                                         index=data.index, 
+                                         columns=geography_columns)
+        # Combine encoded 'Geography' with the rest of the data and drop the old 'Geography' column
+        data = pd.concat([data.drop('Geography', axis=1), geography_encoded], axis=1)
+    
+    return data
 
 # Define the Streamlit app
 def main():
@@ -38,6 +74,13 @@ def main():
         st.subheader('Uploaded Data:')
         st.write(data)
 
+        # Fit the encoders on the initial data (make sure the data used here is consistent with training)
+        label_encoder.fit(['Male', 'Female'])
+        ohe.fit(pd.DataFrame(['France', 'Germany', 'Spain'], columns=['Geography']))
+
+        # Preprocess the data
+        data = preprocess_data(data)
+
         # Make predictions
         predictions = model.predict(data)
 
@@ -45,27 +88,28 @@ def main():
         st.subheader('Predictions:')
         st.write(predictions)
 
-        # Evaluate the model on the uploaded data
-        st.subheader('Evaluation Metrics:')
-        # Assuming X_test and y_test are your test features and labels
-        y_pred = model.predict(data)
-        # You may need to preprocess the data before evaluating
-        # Calculate evaluation metrics
-        # Assuming y_test is the true labels
-        # If you have them, you can calculate the evaluation metrics
-        # accuracy = accuracy_score(y_test, y_pred)
-        # recall = recall_score(y_test, y_pred)
-        # precision = precision_score(y_test, y_pred)
-        # f1 = f1_score(y_test, y_pred)
-        # Print evaluation metrics
-        # st.write("Accuracy:", accuracy)
-        # st.write("Recall:", recall)
-        # st.write("Precision:", precision)
-        # st.write("F1 Score:", f1)
+        # If you have the true labels in the data, you can evaluate the model
+        # Assuming the true labels column is 'label'
+        if 'label' in data.columns:
+            y_true = data['label']
+            y_pred = model.predict(data.drop(columns=['label']))
 
-        # Classification report
-        # st.subheader("Classification Report:")
-        # st.write(classification_report(y_test, y_pred))
+            # Calculate evaluation metrics
+            accuracy = accuracy_score(y_true, y_pred)
+            recall = recall_score(y_true, y_pred, average='binary')  # Adjust average as needed
+            precision = precision_score(y_true, y_pred, average='binary')  # Adjust average as needed
+            f1 = f1_score(y_true, y_pred, average='binary')  # Adjust average as needed
+
+            # Print evaluation metrics
+            st.subheader('Evaluation Metrics:')
+            st.write("Accuracy:", accuracy)
+            st.write("Recall:", recall)
+            st.write("Precision:", precision)
+            st.write("F1 Score:", f1)
+
+            # Classification report
+            st.subheader("Classification Report:")
+            st.write(classification_report(y_true, y_pred))
 
         # Get feature importances from the model
         if hasattr(model, 'feature_importances_'):
